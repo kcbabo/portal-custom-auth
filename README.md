@@ -30,4 +30,4 @@ Authorization: Bearer abc123xyz890
 
 ## Notes
 - Source for the custom auth service can be found in the ```auth-service``` directory. Be sure to change the image repo name if you plan on customizing along with the associate container def in the Deployment
-- I'm running locally in kind and mapping ```:31500``` on my machine to the Kube ingress. You'll need to manage the DNS resolution (I added petstore.example.com and api.example.com directly to my /etc/hosts) based on your own setup. If your hostname or port information is different then make sure you update the Environment and Portal resources in ```petstore-portal.yaml```.
+- I'm running locally in kind and mapping ```:31500``` on my machine to the Kube ingress. You'll need to manage the DNS resolution (I added petstore.example.com and api.example.com directly to my /etc/hosts) based on your own setup. If your hostname or port information are different then make sure you update the Environment and Portal resources in ```petstore-portal.yaml```.

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extauth-httpservice
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: http-extauth
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: http-extauth
+    spec:
+      containers:
+        - name: http-extauth
+          image: kcbabo/passthrough-http-service-example
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-http-auth-service
+  namespace: default
+  labels:
+      app: http-extauth
+spec:
+  ports:
+  - port: 9001
+    protocol: TCP
+  selector:
+      app: http-extauth
+---
+apiVersion: enterprise.gloo.solo.io/v1
+kind: AuthConfig
+metadata:
+  name: passthrough-auth
+  namespace: default
+spec:
+  configs:
+  - passThroughAuth:
+      http:
+        # Address of the http auth server to query
+        url: http://example-http-auth-service.default.svc.cluster.local:9001
+        # Set a connection timeout to external service, default is 5 seconds
+        connectionTimeout: 3s
+        request:
+          allowedHeaders:
+            - api-key
+        response:
+          allowedUpstreamHeaders:
+            - Authorization

@@ -1,0 +1,182 @@
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: Group
+metadata:
+  name: developers
+  namespace: gloo-portal
+spec:
+  displayName: developers
+  # AccessLevel determines the resources the group has access to,
+  # including APIProducts and Portals.
+  accessLevel:
+    apis:
+    - products:
+        namespaces:
+        - "*"
+        labels:
+        - key: app
+          operator: In
+          values:
+          - petstore
+      environments:
+        namespaces:
+        - "*"
+      usagePlans:
+      - basic
+    portals:
+    - name: petstore-portal
+      namespace: default
+  userSelector:
+    matchLabels:
+      groups.portal.gloo.solo.io/gloo-portal.developers: "true"
+---
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: User
+metadata:
+  name: dev1
+  namespace: gloo-portal
+  labels: {
+    groups.portal.gloo.solo.io/gloo-portal.developers: "true"
+  }
+spec:
+  accessLevel: {}
+  basicAuth:
+    passwordSecretKey: password
+    passwordSecretName: dev1-password
+    passwordSecretNamespace: gloo-portal
+  username: dev1
+---
+apiVersion: v1
+kind: Secret
+data: # decoded password is Pa$$w0rd
+  password: JDJhJDEwJFI0RGQwNE1TUTlDSnptOFZYQy5IVE9janBJenplSXRwaW1NVFgxL2p1bWJZSHpXcnNpQ29h
+metadata:
+  name: dev1-password
+  namespace: gloo-portal
+type: opaque
+---
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: APIDoc
+metadata:
+  name: petstore-schema
+  namespace: default
+spec:
+  ## specify the type of schema provided in this APIDoc.
+  ## openApi is only option at this time.
+  openApi:
+    content:
+      # we use a fetchUrl here to tell the Gloo Portal
+      # to fetch the schema contents directly from the petstore service.
+      # 
+      # configmaps and inline strings are also supported.
+      fetchUrl: http://petstore.default:8080/swagger.json
+---
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: APIProduct
+metadata:
+  name: petstore-product
+  namespace: default
+  labels:
+    app: petstore
+spec:
+  displayInfo:
+    description: Petstore Product
+    title: Petstore Product
+  # Specify one or more version objects that will each include a list
+  # of APIs that compose the version and routing for the version  
+  versions:
+  - name: v1
+    apis:
+    # Specify the API Doc(s) that will be included in the Product
+    # each specifier can include a list of individual operations
+    # to import from the API Doc.
+    #
+    # If none are listed, all the 
+    # operations will be imported from the doc. 
+    - apiDoc:
+        name: petstore-schema
+        namespace: default
+    # Each imported operation must have a 'route' associated with it.
+    # Here we define a route that will be used by default for all the selected APIProduct version operations.
+    # You can also set overrides for this route on each individual operation.
+    # A route must be provided for every Operation to enable routing for an API Product.  
+    gatewayConfig:
+      route:
+        inlineRoute:
+          backends:
+          - upstream:
+              name: default-petstore-8080
+              namespace: gloo-system
+    # You can add arbitrary tags to an APIProduct version. 
+    # Users will be able to search for APIs based on the available tags when they log into a portal application.
+    tags:
+      stable: {}
+---
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: Environment
+metadata:
+  name: dev
+  namespace: default
+spec:
+  domains:
+  # If you are using Gloo Edge and the Gateway is listening on a port other than 80, 
+  # you need to include a domain in this format: <DOMAIN>:<PORT>.
+  - api.example.com:31500
+  displayInfo:
+    description: This environment is meant for developers to deploy and test APIs.
+    displayName: Development
+  parameters:
+    usagePlans:
+      basic:
+        displayName: Basic plan with API key auth
+        authPolicy:
+          apiKey: { }
+        customAuthConfig:
+          name: passthrough-auth
+          namespace: default
+        rateLimit:
+          requestsPerUnit: 5
+          unit: MINUTE
+  # This field will determine which APIProduct versions are published in this Environment.
+  # Each entry represents a selector which contains criteria to match the desired API product versions.
+  # Here we use a single selector that will match all APIProducts with the 'app: petstore' label in all namespaces;
+  # Additionally, we want to select only version of these APIProducts that contain the 'stable' tag.
+  apiProducts:
+  - namespaces:
+    - "*" 
+    labels:
+    - key: app
+      operator: Equals
+      values:
+      - petstore
+    versions:
+      tags:
+      - stable
+    usagePlans:
+    - basic
+---
+apiVersion: portal.gloo.solo.io/v1beta1
+kind: Portal
+metadata:
+  name: petstore-portal
+  namespace: default
+spec:
+  displayName: Petstore Portal
+  description: The Gloo Portal for the Petstore API
+  banner:
+    fetchUrl: https://i.imgur.com/EXbBN1a.jpg
+  favicon:
+    fetchUrl: https://i.imgur.com/QQwlQG3.png
+  primaryLogo:
+    fetchUrl: https://i.imgur.com/hjgPMNP.png
+  customStyling: {}
+  staticPages: []
+
+  domains:
+  # If you are using Gloo Edge and the Gateway is listening on a port other than 80, 
+  # you need to include a domain in this format: <DOMAIN>:<INGRESS_PORT> as we do below
+  - petstore.example.com:31500
+
+  # This will include all API product of the environment in the portal
+  publishedEnvironments:
+  - name: dev
+    namespace: default
